@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fd-legal-search-mcp"
+version = "0.1.0"
+description = "识律(lex)法律检索 MCP：法条/类案/指导案例/条级引用解析，逐结果溯源，可私有化部署。"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [{ name = "FindDataTechnology" }]
+dependencies = [
+    "fastmcp>=2.0",
+    "click",
+    "uvicorn",
+    "httpx",
+    "psycopg[binary,pool]>=3.1",
+    "qdrant-client>=1.9",
+    "boto3",
+    "zstandard",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "pytest-asyncio"]
+
+[project.scripts]
+fd-legal-search-mcp = "fd_legal_search_mcp.cli:cli"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.setuptools.packages.find]
+include = ["fd_legal_search_mcp*"]
