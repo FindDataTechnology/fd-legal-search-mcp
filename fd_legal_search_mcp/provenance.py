@@ -21,3 +21,16 @@ class Provenance:
 def with_provenance(item: dict, provenance: Provenance) -> dict:
     """把三件套挂到结果条目上（实现任务填数据时统一走这里）。"""
     return {**item, "provenance": provenance.to_dict()}
+
+
+def ensure_provenance(items: list[dict]) -> list[dict]:
+    """结果列表契约守卫：任一条目缺三件套即抛 AssertionError。
+
+    这是 bug，不是可降级项——实现任务在返回前调用；
+    tests/test_provenance_contract.py 以 live 方式强制覆盖已接线工具。
+    """
+    for i, item in enumerate(items):
+        prov = item.get("provenance") if isinstance(item, dict) else None
+        if not (isinstance(prov, dict) and prov.get("source") and prov.get("stable_id") and prov.get("as_of")):
+            raise AssertionError(f"item[{i}] 缺 provenance 三件套: {str(item)[:120]}")
+    return items
