@@ -55,8 +55,16 @@ _MAX_LIMIT = 200
 #: 候选采样上限：contains 查询一次最多取回的命中数（提前终止，防宽泛词拖垮）。
 _CANDIDATE_CAP = 2000
 
-#: 正文返回上限（字符）；超出截断并如实标注。
-_MAX_CONTENT_CHARS = 200_000
+#: 正文返回上限（字符）；超出截断并如实标注 + 给出续读游标。
+#: 20 万字符的中文正文约等于 20 万 token——足以独占一次对话的上下文预算，
+#: 而实测单篇最大约 41KB，也就是说旧上限只在最坏情况下起作用、一旦起作用
+#: 就是把调用方打爆。默认值取「一次放进上下文仍然可读」的量级；需要更长正文
+#: 的调用方用 offset 续读，而不是让单次响应变长。
+_MAX_CONTENT_CHARS = 12_000
+
+#: 单次窗口的硬上限：调用方可以把 ``max_chars`` 调大，但不能无界——那等于
+#: 把上限这件事取消掉，而它存在的理由正是保护调用方的上下文。
+_MAX_WINDOW_CHARS = 40_000
 
 #: Internal coordinates and raw dictionary refs that must never reach a
 #: customer payload. SQL 只在过滤/定位时用它们，投影白名单 + 本黑名单双保险。
@@ -334,7 +342,7 @@ def register(mcp: FastMCP, settings: Settings) -> None:
         end_year: int | None = None,
         limit: int = 50,
     ) -> dict[str, Any]:
-        """Search judgment titles (1,050万篇裁判文书), ranked exact > prefix > contains.
+        """Search judgment titles (3,700万篇裁判文书), ranked exact > prefix > contains.
 
         案号内嵌于标题（如「（2024）京01民初1号」），无需单独案号参数。
         结果逐条携带 provenance（source=wenshu_db.judgments, stable_id=doc_id）。
@@ -458,11 +466,15 @@ def register(mcp: FastMCP, settings: Settings) -> None:
         return out
 
     @mcp.tool
-    def wenshu_read(doc_id: str) -> dict[str, Any]:
+    def wenshu_read(doc_id: str, offset: int = 0, max_chars: int = _MAX_CONTENT_CHARS) -> dict[str, Any]:
         """Read one judgment's full text (zstd blocks on RustFS).
 
         正文按块解压读取；条目存在而正文缺失时如实标注，绝不编造正文。
         与 business-mcp wenshu_read 等价迁移（lex-platform-v1 task 7.1）。
+
+        长正文按窗口返回：单次最多 ``max_chars`` 字符（默认 12000，上限 40000）。
+        超出时 ``content_truncated=true`` 且给 ``next_offset``——把它作为
+        ``offset`` 再调一次即可续读，分段按字符切分，拼接后与原文逐字符一致。
         """
         did = (doc_id or "").strip()
         if not did:
@@ -508,15 +520,29 @@ def register(mcp: FastMCP, settings: Settings) -> None:
                 out["note"] = _BODY_UNAVAILABLE_NOTE
             else:
                 out["content_available"] = True
-                if len(content) > _MAX_CONTENT_CHARS:
-                    out["content"] = content[:_MAX_CONTENT_CHARS]
+                out["total_chars"] = len(content)
+                window = max(1, min(int(max_chars), _MAX_WINDOW_CHARS))
+                start_at = max(0, int(offset))
+                if start_at >= len(content) and content:
+                    # Reading past the end is a caller error worth naming, not a
+                    # silent empty string that looks like "the document ends here".
+                    raise NotFound(
+                        f"offset {start_at} 超出正文长度 {len(content)}；"
+                        "用 total_chars 上的偏移重试。"
+                    )
+                chunk = content[start_at:start_at + window]
+                out["content"] = chunk
+                end_at = start_at + len(chunk)
+                out["content_offset"] = start_at
+                if end_at < len(content):
                     out["content_truncated"] = True
+                    out["next_offset"] = end_at
                     out["note"] = (
-                        f"正文超出 {_MAX_CONTENT_CHARS} 字符已截断"
-                        f"（原始 {len(content)} 字符）。"
+                        f"正文共 {len(content)} 字符，本次返回 [{start_at}, {end_at})；"
+                        f"续读请传 offset={end_at}。"
                     )
                 else:
-                    out["content"] = content
+                    out["content_truncated"] = False
         out = {k: v for k, v in out.items() if k not in _FORBIDDEN_KEYS}
         out = with_provenance(out, Provenance(_WENSHU_SOURCE, did, _as_of(row)))
         ensure_provenance([out])

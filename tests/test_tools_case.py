@@ -384,15 +384,21 @@ async def test_tool_signatures_and_docstrings_preserved():
     assert "ranked exact > prefix > contains" in desc
     assert "provenance（source=wenshu_db.judgments, stable_id=doc_id）" in desc
     assert "与 business-mcp wenshu_search 等价迁移（lex-platform-v1 task 7.1）" in desc
-    assert "1,050万篇裁判文书" in desc
+    # 口径以 fd-lex/collateral/numbers.md N3/N4 为准（3,700 万）。旧文案的
+    # 1,050 万是历史快照，numbers.md 已明文废止该数字。
+    assert "3,700万篇裁判文书" in desc
 
     r = tools["wenshu_read"]
-    assert set(schema(r)["properties"]) == {"doc_id"}
+    # 正文按窗口返回，故签名在 doc_id 之外带两个续读参数（默认值即文档窗口）。
+    assert set(schema(r)["properties"]) == {"doc_id", "offset", "max_chars"}
     assert schema(r)["required"] == ["doc_id"]
+    assert schema(r)["properties"]["offset"].get("default") == 0
+    assert schema(r)["properties"]["max_chars"].get("default") == 12000
     rdesc = r.description or ""
     assert "Read one judgment's full text (zstd blocks on RustFS)." in rdesc
     assert "绝不编造正文" in rdesc
     assert "与 business-mcp wenshu_read 等价迁移（lex-platform-v1 task 7.1）" in rdesc
+    assert "next_offset" in rdesc
 
 
 def test_read_block_module_never_raises():
@@ -401,3 +407,82 @@ def test_read_block_module_never_raises():
     assert tools_case.fetch_judgment_body(settings, "", "x") is None
     assert tools_case.fetch_judgment_body(settings, "k", "") is None
     assert tools_case.fetch_judgment_body(settings, "k", "x") is None  # 无客户端配置
+
+
+# --- 正文按窗口返回（体积上限与续读）-----------------------------------------
+
+
+async def test_read_body_is_windowed_and_resumable(monkeypatch):
+    """长正文分段返回；分段拼接必须与原文逐字符一致。
+
+    单次响应把整篇正文塞回去会挤占调用方的上下文预算（旧上限 20 万字符 ≈
+    20 万 token），所以正文按窗口返回，靠 next_offset 续读。
+    """
+    body = "本院认为：" + ("根据合同法相关规定，双方应当依约履行。\n" * 1500)
+    assert len(body) > 20_000
+    _install_read(monkeypatch, _read_row())
+    _install_rustfs(monkeypatch, _legacy_block({"abc123": body}))
+
+    pieces: list[str] = []
+    offset = 0
+    async with Client(create_server()) as client:
+        for _ in range(20):  # 有界循环：分段数必须收敛
+            r = await client.call_tool(
+                "wenshu_read", {"doc_id": "abc123", "offset": offset}
+            )
+            d = r.data
+            assert len(d["content"]) <= d["total_chars"]
+            assert d["content_offset"] == offset
+            pieces.append(d["content"])
+            if not d["content_truncated"]:
+                assert "next_offset" not in d
+                break
+            assert d["next_offset"] == offset + len(d["content"])
+            offset = d["next_offset"]
+        else:
+            pytest.fail("正文分段未在 20 次内收敛")
+
+    assert "".join(pieces) == body, "分段拼接必须还原原文"
+
+
+async def test_read_short_body_is_not_truncated(monkeypatch):
+    """窗口内的正文一次返回完整，不出现截断标记。"""
+    body = "短正文：判决如下。"
+    _install_read(monkeypatch, _read_row())
+    _install_rustfs(monkeypatch, _legacy_block({"abc123": body}))
+    async with Client(create_server()) as client:
+        r = await client.call_tool("wenshu_read", {"doc_id": "abc123"})
+    d = r.data
+    assert d["content"] == body
+    assert d["content_truncated"] is False
+    assert d["total_chars"] == len(body)
+    assert "next_offset" not in d
+
+
+async def test_read_offset_past_end_is_named(monkeypatch):
+    """越过末尾的 offset 如实报错，不返回空串冒充「正文到此为止」。"""
+    from fastmcp.exceptions import ToolError
+
+    _install_read(monkeypatch, _read_row())
+    _install_rustfs(monkeypatch, _legacy_block({"abc123": "短正文"}))
+    async with Client(create_server()) as client:
+        with pytest.raises(ToolError) as ei:
+            await client.call_tool(
+                "wenshu_read", {"doc_id": "abc123", "offset": 9999}
+            )
+    assert "9999" in str(ei.value)
+
+
+async def test_read_window_never_splits_a_cjk_character(monkeypatch):
+    """按字符切分：每个分段都是合法文本，拼接无乱码。"""
+    body = "中华人民共和国" * 4000
+    _install_read(monkeypatch, _read_row())
+    _install_rustfs(monkeypatch, _legacy_block({"abc123": body}))
+    async with Client(create_server()) as client:
+        r = await client.call_tool(
+            "wenshu_read", {"doc_id": "abc123", "max_chars": 7}
+        )
+    d = r.data
+    assert len(d["content"]) == 7
+    assert d["content"] == body[:7]
+    assert "\ufffd" not in d["content"]

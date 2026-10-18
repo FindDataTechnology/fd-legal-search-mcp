@@ -24,7 +24,7 @@ def register(mcp: FastMCP, settings: Settings) -> None:
         doc_type: str | None = None,
         limit: int = 50,
     ) -> dict[str, Any]:
-        """Search legal-document titles across the five corpora (29,958 篇).
+        """Search legal-document titles across the five corpora (47,256 篇).
 
         source 为五源代码封闭词表，非法值如实拒绝。
         结果逐条携带 provenance（source=law_db.legal_documents, stable_id=source_id）。

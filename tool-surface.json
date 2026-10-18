@@ -31,8 +31,8 @@
         "law_reference"
       ],
       "data_sources": [
-        "law_db.laws（法规目录 32,275 部）",
-        "Qdrant law_chunks_v2（247,364 点，1024 维语义索引）"
+        "law_db.laws（法规目录 32,296 部）",
+        "Qdrant law_chunks_v2（364,801 点，1024 维语义索引）"
       ],
       "notes": "对外口径：法条效力状态以 fd-find-data-business-mcp 的 law_search/law_read 返回的 status 为准；本组语义检索 payload 中的 law_status 为快照字段，不作为权威效力判定。"
     },
@@ -68,7 +68,7 @@
         "legal_docs_read"
       ],
       "data_sources": [
-        "law_db.legal_documents（29,958 篇五源语料）"
+        "law_db.legal_documents（47,256 篇五源语料）"
       ],
       "notes": "骨架态：tools_corpus.py 仍 raise not_wired('7.1')（task 7.1 迁移中），调用返回诚实错误而非数据。定级 internal——接线完成并经对账前不得进商业供给面；消费侧技能（legal-concept-map）已内置降级路径。",
       "promote_when": "task 7.1 接线完成 + 与 business-mcp 等价对账通过 + 本组改判 commercial 并重跑 selfcheck"

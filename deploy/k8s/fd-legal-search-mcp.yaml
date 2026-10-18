@@ -1,7 +1,10 @@
 # fd-legal-search-mcp — prod (fd-prod)
 # 识律法律检索 MCP（lex-platform-v1；FastMCP streamable-http /mcp on :8000）。
 # env ← Secret fd-legal-search-env（键名表见 deploy/README.md；清单不含明文）。
-# 资源轻档：fd-prod requests.memory 余量小（wire 同约束），requests 合计须克制。
+# 资源档：requests 保持轻（fd-prod 余量小），但 limits 必须给足——256Mi 的旧值
+# 导致 13 天 12 次 OOMKilled（exit 137，实测 2026-10-19），判卷文书正文时进程
+# 峰值远超该值。1Gi 是「单篇正文 + 解压块 + 连接池」的安全边际；正文返回体积
+# 已在工具侧收紧（默认 12k 字符），此处是第二道保护而非唯一防线。
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -38,7 +41,7 @@ spec:
                 name: fd-legal-search-env
           resources:
             requests: { cpu: 20m, memory: 96Mi }
-            limits: { cpu: 500m, memory: 256Mi }
+            limits: { cpu: 500m, memory: 1Gi }
 ---
 apiVersion: v1
 kind: Service

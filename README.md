@@ -11,11 +11,11 @@
 | 工具 | 能力 | 数据源 | 实现跟踪 |
 |---|---|---|---|
 | `law_search` / `law_read` | 法条检索 / 法规详情 | `law_db.laws` | task 7.1（迁自 business-mcp，等价对账） |
-| `law_semantic_search` | 法条语义检索 | Qdrant `law_chunks_v2`（247,364 点，1024 维） | task 1.2 |
-| `law_reference` | 条级引用解析 | 法规目录（32,275 部） | task 1.2 |
+| `law_semantic_search` | 法条语义检索 | Qdrant `law_chunks_v2`（364,801 点，1024 维） | task 1.2 |
+| `law_reference` | 条级引用解析 | 法规目录（32,296 部） | task 1.2 |
 | `wenshu_search` / `wenshu_read` | 类案检索 / 裁判文书正文 | `wenshu_db`（3,700 万篇，见上方口径注）+ RustFS zstd 块 | task 1.3 |
 | `guide_cases_search` / `guide_cases_read` | 指导案例检索 / 读取 | `law_db.guide_cases`（278+15） | task 1.4 |
-| `legal_docs_search` / `legal_docs_read` | 五源语料检索 / 读取 | `law_db.legal_documents`（29,958 篇） | task 7.1（迁自 business-mcp，等价对账） |
+| `legal_docs_search` / `legal_docs_read` | 五源语料检索 / 读取 | `law_db.legal_documents`（47,256 篇） | task 7.1（迁自 business-mcp，等价对账） |
 
 骨架阶段：全部工具以诚实错误回报未接线状态（消息含 tracking task），不返回编造数据；未命中一律如实返回空结果。
 

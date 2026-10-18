@@ -282,6 +282,22 @@ _CHUNKS_OF_LAW_SQL = (
     "FROM law_chunks_v2 WHERE law_id = %(law_id)s ORDER BY chunk_no"
 )
 
+#: 条文窗口查询：按 chunk_no 排序后切片，保证 offset 分页稳定且可分页还原。
+_CHUNKS_OF_LAW_WINDOW_SQL = (
+    "SELECT chunk_id, chunk_no, chunk_text, char_start, char_end, created_at\n"
+    "FROM law_chunks_v2 WHERE law_id = %(law_id)s\n"
+    "ORDER BY chunk_no OFFSET %(offset)s LIMIT %(limit)s"
+)
+
+_COUNT_CHUNKS_OF_LAW_SQL = (
+    "SELECT count(*) AS n FROM law_chunks_v2 WHERE law_id = %(law_id)s"
+)
+
+#: 单次返回的条文窗口：默认 200 条（一部典型法规的规模量级），硬上限 500。
+#: 整部法规全量回传会让大法典独占调用方上下文，故与正文一样按窗口给。
+_DEFAULT_CHUNK_WINDOW = 200
+_MAX_CHUNK_WINDOW = 500
+
 _CHUNK_CREATED_AT_SQL = (
     "SELECT chunk_id, created_at FROM law_chunks_v2 WHERE chunk_id = ANY(%(ids)s)"
 )
@@ -333,23 +349,58 @@ def register(mcp: FastMCP, settings: Settings) -> None:
         return {"results": results, "count": min(len(rows), limit), "truncated": truncated}
 
     @mcp.tool
-    def law_read(law_id: int) -> dict[str, Any]:
+    def law_read(law_id: int, offset: int = 0, limit: int = _DEFAULT_CHUNK_WINDOW) -> dict[str, Any]:
         """Read one law's metadata and text chunks by law_id.
 
         返回法规详情与条级 chunk 结构，供正文阅读与条级引用使用。
         与 business-mcp law_read 等价迁移（lex-platform-v1 task 7.1）。
+
+        条文按窗口返回：单次最多 ``limit`` 条（默认 200，上限 500），从
+        ``offset`` 起算。整部法规一次全量回传会让大法典独占调用方上下文；
+        ``total_chunks`` 与 ``next_offset`` 给出续读位置，分段拼接即全文。
         """
         pool = get_pool(_LAW_DB_ENV, settings.law_database_url)
         row = fetch_one(pool, _LAW_BY_ID_SQL, {"law_id": law_id})
         if not row:
             raise NotFound(f"not_found：law_id={law_id} 在法规目录（law_db.laws）中不存在")
         law = _law_item(row)
-        chunk_rows = fetch_all(pool, _CHUNKS_OF_LAW_SQL, {"law_id": law_id})
+        window = max(1, min(int(limit), _MAX_CHUNK_WINDOW))
+        start_at = max(0, int(offset))
+        # Count first, then window: the caller needs the total to know whether a
+        # next page exists, and it must not be inferred from a short page (which
+        # also happens at an exact multiple).
+        total_row = fetch_one(pool, _COUNT_CHUNKS_OF_LAW_SQL, {"law_id": law_id})
+        total = int((total_row or {}).get("n") or 0)
+        if start_at >= total and total:
+            raise NotFound(
+                f"offset {start_at} 超出该法规条文数 {total}；用 total_chunks 内的偏移重试。"
+            )
+        chunk_rows = fetch_all(
+            pool, _CHUNKS_OF_LAW_WINDOW_SQL,
+            {"law_id": law_id, "offset": start_at, "limit": window},
+        )
         chunks = [_chunk_item(r) for r in chunk_rows]
         ensure_provenance(chunks)
         ensure_provenance([law])
-        # 顶层 provenance = 主实体（该法规行）的三件套；chunk 逐条自带。
-        return {"law": law, "chunks": chunks, "count": len(chunks), "provenance": law["provenance"]}
+        end_at = start_at + len(chunks)
+        out: dict[str, Any] = {
+            "law": law,
+            "chunks": chunks,
+            "count": len(chunks),
+            "total_chunks": total,
+            "chunk_offset": start_at,
+            "provenance": law["provenance"],
+        }
+        if end_at < total:
+            out["truncated"] = True
+            out["next_offset"] = end_at
+            out["note"] = (
+                f"该法规共 {total} 条，本次返回第 {start_at}–{end_at} 条；"
+                f"续读请传 offset={end_at}。"
+            )
+        else:
+            out["truncated"] = False
+        return out
 
     @mcp.tool
     def law_semantic_search(query: str, top_k: int = 10) -> dict[str, Any]:

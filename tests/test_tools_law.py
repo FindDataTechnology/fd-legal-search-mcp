@@ -149,8 +149,16 @@ def wired(monkeypatch):
             if "title ILIKE" in sql:  # _resolve_law
                 needle = str(params["pattern"]).strip("%")
                 return [r for r in laws_rows if needle in (r["title"] or "")]
+            if "count(*) AS n FROM law_chunks_v2" in sql:  # law_read 窗口计数
+                return [{"n": len(chunks_by_law.get(params["law_id"], []))}]
             if "FROM law_chunks_v2 WHERE law_id" in sql:  # law_read / law_reference
-                return list(chunks_by_law.get(params["law_id"], []))
+                rows = list(chunks_by_law.get(params["law_id"], []))
+                # 窗口查询带 OFFSET/LIMIT；按 chunk_no 排序后切片，模拟 SQL 行为。
+                if "OFFSET" in sql:
+                    off = int(params.get("offset") or 0)
+                    lim = int(params.get("limit") or len(rows) or 1)
+                    rows = sorted(rows, key=lambda r: r["chunk_no"])[off:off + lim]
+                return rows
             if "chunk_id = ANY" in sql:  # semantic as_of
                 want = set(params["ids"])
                 return [
@@ -304,7 +312,8 @@ async def test_law_search_signatures_match_business_mcp_surface(wired):
         tools = {t.name: t for t in await client.list_tools()}
     props = {name: sorted((t.input_schema or {}).get("properties", {})) for name, t in tools.items()}
     assert props["law_search"] == ["category", "limit", "title_query"]
-    assert props["law_read"] == ["law_id"]
+    # law_read 带两个续读参数：条文按窗口返回，避免大法典一次性独占调用方上下文。
+    assert props["law_read"] == ["law_id", "limit", "offset"]
     assert props["law_semantic_search"] == ["query", "top_k"]
     assert props["law_reference"] == ["citation"]
 
@@ -465,3 +474,58 @@ async def test_reference_suffix_article(wired):
 def test_not_found_and_validation_are_lex_errors():
     assert NotFound.kind == "not_found"
     assert Validation.kind == "validation"
+
+
+# ---------------------------------------------------------------- law_read 分页
+
+async def test_law_read_chunks_are_windowed_and_resumable(wired):
+    """条文按窗口返回；分段拼接即全文，且 total_chunks 让调用方知道还有没有下一页。
+
+    整部法规一次全量回传会让大法典独占调用方上下文（民法典 1260 条）。
+    """
+    _, _, _ = wired()
+    rows = _mini_chunks()
+    server, _, _ = wired(chunks_by_law={69695: rows}, laws_rows=[_law_row()])
+    collected: list[str] = []
+    offset = 0
+    async with Client(server) as client:
+        for _ in range(10):
+            r = await client.call_tool(
+                "law_read", {"law_id": 69695, "offset": offset, "limit": 1}
+            )
+            d = r.data
+            assert d["total_chunks"] == 3
+            assert d["chunk_offset"] == offset
+            collected.extend(c["chunk_text"] for c in d["chunks"])
+            if not d["truncated"]:
+                assert "next_offset" not in d
+                break
+            offset = d["next_offset"]
+        else:
+            pytest.fail("条文分页未收敛")
+
+    assert collected == [r["chunk_text"] for r in rows]
+
+
+async def test_law_read_single_page_when_window_covers_all(wired):
+    """窗口覆盖全部条文时一次返回，不出现截断标记。"""
+    rows = _mini_chunks()
+    server, _, _ = wired(chunks_by_law={69695: rows}, laws_rows=[_law_row()])
+    async with Client(server) as client:
+        r = await client.call_tool("law_read", {"law_id": 69695})
+    d = r.data
+    assert d["count"] == 3
+    assert d["truncated"] is False
+    assert "next_offset" not in d
+
+
+async def test_law_read_offset_past_end_is_named(wired):
+    """越过条文数的 offset 如实报错，不返回空列表冒充「法规到此为止」。"""
+    from fastmcp.exceptions import ToolError
+
+    rows = _mini_chunks()
+    server, _, _ = wired(chunks_by_law={69695: rows}, laws_rows=[_law_row()])
+    async with Client(server) as client:
+        with pytest.raises(ToolError) as ei:
+            await client.call_tool("law_read", {"law_id": 69695, "offset": 99})
+    assert "99" in str(ei.value)
