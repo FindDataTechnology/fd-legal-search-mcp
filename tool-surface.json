@@ -62,7 +62,7 @@
     },
     {
       "group": "corpus",
-      "level": "internal",
+      "level": "commercial",
       "tools": [
         "legal_docs_search",
         "legal_docs_read"
@@ -70,8 +70,8 @@
       "data_sources": [
         "law_db.legal_documents（47,256 篇五源语料）"
       ],
-      "notes": "骨架态：tools_corpus.py 仍 raise not_wired('7.1')（task 7.1 迁移中），调用返回诚实错误而非数据。定级 internal——接线完成并经对账前不得进商业供给面；消费侧技能（legal-concept-map）已内置降级路径。",
-      "promote_when": "task 7.1 接线完成 + 与 business-mcp 等价对账通过 + 本组改判 commercial 并重跑 selfcheck"
+      "notes": "已接线（2026-10-19，finance-legal-trust-gates §5）。与 business-mcp 同名工具语义等价：exact>prefix>contains 排序、五源封闭词表（非法值返回 invalid_filter + valid_sources）、正文未抓取时 content 键缺席并附 note。额外契约：每条结果带 provenance 三件套。实况核验：安全生产法/民法典/监察法 三查询计数与 SQL 基线逐一相同（1/1/8），source 过滤生效，read 命中 18885 返回正文、未知 id 返回 not_found。",
+      "promote_when": "已达成（2026-10-19）：task 7.1 接线完成 + 与 business-mcp 等价对账通过 + 本组改判 commercial"
     }
   ],
   "registry": {
