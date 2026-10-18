@@ -28,7 +28,7 @@ spec:
     spec:
       containers:
         - name: mcp
-          image: ccr.ccs.tencentyun.com/finddata-business/fd-legal-search-mcp:sha-1c844e3
+          image: ccr.ccs.tencentyun.com/finddata-business/fd-legal-search-mcp:sha-b4b2df7
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
