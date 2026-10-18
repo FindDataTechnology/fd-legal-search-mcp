@@ -22,7 +22,27 @@ env:
   DOCKERFILE: Dockerfile
 
 jobs:
+  # 测试先跑：工具面契约（provenance 三要素、分页窗口、stub 语义）是核心不变量，
+  # 测试不过不应出片。整套用例离线可跑，无需任何外部服务。
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Test suite
+        run: python -m pytest tests/ -q
+
   build-push:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
