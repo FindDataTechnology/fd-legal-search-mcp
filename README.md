@@ -39,6 +39,7 @@ python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
 
 ## 发布通道
 
-GitHub Actions -> TCR（`hkccr.ccs.tencentyun.com/finddata-business/fd-legal-search-mcp`，
-tag `sha-<短哈希>` + `main`；cheap-3 tcr-relay 5 分钟内回灌 `ccr` 侧）。配方：`docs/IMAGE-RELEASE.md`。
-Jenkins->Harbor 为回退通道。
+GitHub Actions -> TCR。每次 push 到 `main` 先跑测试，通过后构建并推送镜像，
+tag 为 `sha-<短哈希>` + 滚动 `main`。构建发生在**公开**镜像仓（`scs001/fd-legal-search-mcp`）：
+私有仓的 Actions 有月度分钟额度，用尽后 job 会在启动阶段直接失败（无 runner、无日志），
+公开仓不限时。发布脚本：`scripts/publish-public-mirror.sh`。
