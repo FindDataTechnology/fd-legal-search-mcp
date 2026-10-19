@@ -7,10 +7,13 @@
 
 from __future__ import annotations
 
+import functools
+
 from fastmcp import FastMCP
 
 from . import tools_case, tools_corpus, tools_guide, tools_law
 from .config import Settings
+from . import workflows
 
 SERVER_NAME = "fd-legal-search-mcp"
 
@@ -28,4 +31,11 @@ def create_server(settings: Settings | None = None) -> FastMCP:
     tools_case.register(mcp, settings)
     tools_guide.register(mcp, settings)
     tools_corpus.register(mcp, settings)
+
+    # 工作流级知识随服务暴露（mcp-surface-contract 组 7）：调用方需要时才拉取，
+    # 不必塞进每个工具的 description 里被反复读进上下文。
+    for uri, (title, text) in workflows.RESOURCES.items():
+        # 每个 URI 一个闭包：直接捕获循环变量会让三份资源都指向最后一份。
+        mcp.resource(uri, name=title, mime_type="text/markdown")(
+            functools.partial(lambda _t: _t, text))
     return mcp
