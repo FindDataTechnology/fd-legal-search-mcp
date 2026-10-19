@@ -19,6 +19,7 @@ from fastmcp import FastMCP
 from .config import Settings
 from .db import fetch_all, get_pool
 from .provenance import Provenance, ensure_provenance, with_provenance
+from .textmatch import escape_like, rank
 
 _LAW_DB_ENV = "FDLEX_LAW_DATABASE_URL"
 
@@ -62,21 +63,6 @@ _NO_BODY_NOTE = (
 )
 
 _SOURCE_TABLE = "law_db.legal_documents"
-
-
-def _escape_like(q: str) -> str:
-    """转义 LIKE 元字符，使用户输入按字面匹配。"""
-    return q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-
-
-def _rank(title: str | None, needle: str) -> int:
-    """0 exact / 1 prefix / 2 contains — 与 SQL CASE 排序一致。"""
-    t = (title or "").lower()
-    if t == needle:
-        return 0
-    if t.startswith(needle):
-        return 1
-    return 2
 
 
 def _strip_object_keys(metadata: Any) -> Any:
@@ -130,7 +116,7 @@ def register(mcp: FastMCP, settings: Settings) -> None:
                 "brand": _BRAND,
             }
         limit = min(max(int(limit), 1), _MAX_LIMIT)
-        esc = _escape_like(q)
+        esc = escape_like(q)
         params: list[Any] = [f"%{esc}%"]
         sql = (
             "SELECT id, title, source, doc_type, status, authority, language,\n"
@@ -155,7 +141,7 @@ def register(mcp: FastMCP, settings: Settings) -> None:
         rows = fetch_all(pool, sql, tuple(params))
 
         needle = q.lower()
-        rows.sort(key=lambda r: (_rank(r.get("title"), needle), r.get("title") or ""))
+        rows.sort(key=lambda r: (rank(r.get("title"), needle), r.get("title") or ""))
         truncated = len(rows) > limit
         hits = []
         for row in rows[:limit]:

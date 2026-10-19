@@ -44,6 +44,7 @@ from .config import Settings
 from .db import fetch_all, get_pool, get_rustfs
 from .errors import NotFound, UpstreamUnavailable
 from .provenance import Provenance, ensure_provenance, with_provenance
+from .textmatch import escape_like, rank
 
 logger = logging.getLogger(__name__)
 
@@ -101,21 +102,6 @@ _DECODE_JOINS = (
     ('dpr', "审理程序", "审理程序引用"),
     ('dcl', "法院级别", "法院级别引用"),
 )
-
-
-def _escape_like(q: str) -> str:
-    """Escape LIKE/ILIKE metacharacters so user input matches literally."""
-    return q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-
-
-def _rank(title: str | None, needle: str) -> int:
-    """0 exact, 1 prefix, 2 contains — mirrors the SQL CASE ranking."""
-    t = (title or "").lower()
-    if t == needle:
-        return 0
-    if t.startswith(needle):
-        return 1
-    return 2
 
 
 def _decode_join_sql() -> str:
@@ -353,7 +339,7 @@ def register(mcp: FastMCP, settings: Settings) -> None:
             return {"results": [], "count": 0, "truncated": False, "brand": _BRAND}
         limit = min(max(int(limit), 1), _MAX_LIMIT)
         needle = q.lower()
-        esc = _escape_like(q)
+        esc = escape_like(q)
         try:
             pool = get_pool("FDLEX_WENSHU_DATABASE_URL", settings.wenshu_database_url)
 
@@ -407,7 +393,7 @@ def register(mcp: FastMCP, settings: Settings) -> None:
             )
             sampled = len(rows) >= _CANDIDATE_CAP
             total_candidates = len(rows)
-            rows = sorted(rows, key=lambda r: (_rank(r.get("标题"), needle),
+            rows = sorted(rows, key=lambda r: (rank(r.get("标题"), needle),
                                                r.get("标题") or ""))[:limit]
             if not rows:
                 return {"results": [], "count": 0, "truncated": False,

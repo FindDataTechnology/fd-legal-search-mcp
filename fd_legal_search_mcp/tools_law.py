@@ -22,6 +22,7 @@ from .db import fetch_all, fetch_one, get_pool, get_qdrant
 from .embedding import get_embedder
 from .errors import NotFound, Validation
 from .provenance import Provenance, ensure_provenance, with_provenance
+from .textmatch import escape_like, rank
 
 _LAW_DB_ENV = "FDLEX_LAW_DATABASE_URL"
 
@@ -153,25 +154,10 @@ def _dedupe_authoritative(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [min(group, key=_authority_key) for group in groups.values()]
 
 
-def _escape_like(q: str) -> str:
-    """Escape LIKE/ILIKE metacharacters so user input matches literally."""
-    return q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-
-
-def _rank(title: str | None, needle: str) -> int:
-    """0 exact, 1 prefix, 2 contains — mirrors the SQL CASE ranking."""
-    t = (title or "").lower()
-    if t == needle:
-        return 0
-    if t.startswith(needle):
-        return 1
-    return 2
-
-
 def _resolve_law(pool: Any, title: str) -> dict[str, Any]:
     """标题 -> laws 唯一权威行：exact > 全称(中华人民共和国+简称) > 前缀 > contains，
     同级按权威性择优。找不到抛 NotFound（含可读原因），绝不猜。"""
-    esc = _escape_like(title)
+    esc = escape_like(title)
     rows = fetch_all(
         pool,
         "SELECT id, title, category, type, status, publish, created_at\n"
@@ -322,7 +308,7 @@ def register(mcp: FastMCP, settings: Settings) -> None:
         if not q:
             return {"results": [], "count": 0, "truncated": False}
         limit = min(max(limit, 1), _MAX_LIMIT)
-        esc = _escape_like(q)
+        esc = escape_like(q)
         params: dict[str, Any] = {
             "pattern": f"%{esc}%",
             "exact": esc,
@@ -342,7 +328,7 @@ def register(mcp: FastMCP, settings: Settings) -> None:
         pool = get_pool(_LAW_DB_ENV, settings.law_database_url)
         rows = _dedupe_authoritative(fetch_all(pool, sql, params))
         needle = q.lower()
-        rows = sorted(rows, key=lambda r: (_rank(r.get("title"), needle), r.get("title") or ""))
+        rows = sorted(rows, key=lambda r: (rank(r.get("title"), needle), r.get("title") or ""))
         truncated = len(rows) > limit
         results = [_law_item(r) for r in rows[:limit]]
         ensure_provenance(results)

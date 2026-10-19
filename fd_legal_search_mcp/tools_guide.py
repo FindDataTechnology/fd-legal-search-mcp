@@ -22,6 +22,7 @@ from .config import Settings
 from .db import fetch_all, get_pool
 from .errors import NotFound, Validation
 from .provenance import Provenance, ensure_provenance, with_provenance
+from .textmatch import escape_like
 
 #: provenance.source 固定口径（spec lex-mcp-surface）。
 PROVENANCE_SOURCE = "law_db.guide_cases"
@@ -45,11 +46,6 @@ _READ_FIELDS = (
     "source_id", "case_no", "doc_type", "title",
     "listed_at", "publish_at", "source", "source_url",
 )
-
-
-def _escape_like(q: str) -> str:
-    """转义 LIKE/ILIKE 元字符，使用户输入按字面匹配。"""
-    return q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 def _reject_filter(field: str, value: str, valid: frozenset[str]) -> Validation:
@@ -100,7 +96,7 @@ def register(mcp: FastMCP, settings: Settings) -> None:
             if reference_status not in _REFERENCE_STATUSES:
                 raise _reject_filter("reference_status", reference_status, _REFERENCE_STATUSES)
         limit = min(max(int(limit), 1), _MAX_LIMIT)
-        esc = _escape_like(q)
+        esc = escape_like(q)
         sql = (
             "SELECT source_id, case_no, doc_type, title,\n"
             "       listed_at::date::text AS listed_at,\n"
