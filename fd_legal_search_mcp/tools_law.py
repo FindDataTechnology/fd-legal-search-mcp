@@ -24,6 +24,7 @@ from .errors import NotFound, Validation
 from .provenance import Provenance, ensure_provenance, with_provenance
 from .textmatch import escape_like, rank
 from .annotations import annotations_for
+from .error_mapping import map_errors
 from . import limits
 
 _LAW_DB_ENV = "FDLEX_LAW_DATABASE_URL"
@@ -300,6 +301,7 @@ _EXCERPT_MAX_CHARS = limits.MAX_EXCERPT_CHARS
 def register(mcp: FastMCP, settings: Settings) -> None:
 
     @mcp.tool(annotations=annotations_for("law_search"))
+    @map_errors
     def law_search(title_query: str, category: str | None = None, limit: int = 50) -> dict[str, Any]:
         """Search FindData law titles, ranked exact > prefix > contains.
 
@@ -338,6 +340,7 @@ def register(mcp: FastMCP, settings: Settings) -> None:
         return {"results": results, "count": min(len(rows), limit), "truncated": truncated}
 
     @mcp.tool(annotations=annotations_for("law_read"))
+    @map_errors
     def law_read(law_id: int, offset: int = 0, limit: int = _DEFAULT_CHUNK_WINDOW) -> dict[str, Any]:
         """Read one law's metadata and text chunks by law_id.
 
@@ -387,6 +390,7 @@ def register(mcp: FastMCP, settings: Settings) -> None:
         return out
 
     @mcp.tool(annotations=annotations_for("law_semantic_search"))
+    @map_errors
     def law_semantic_search(query: str, top_k: int = 10) -> dict[str, Any]:
         """法条语义检索：Qwen3-Embedding-0.6B 查询向量 -> Qdrant law_chunks_v2。
 
@@ -446,6 +450,7 @@ def register(mcp: FastMCP, settings: Settings) -> None:
         return {"query": q, "results": results, "count": len(results)}
 
     @mcp.tool(annotations=annotations_for("law_reference"))
+    @map_errors
     def law_reference(citation: str) -> dict[str, Any]:
         """条级引用解析：把「《民法典》第一百四十三条」类引用解析到法规目录条级定位。
 

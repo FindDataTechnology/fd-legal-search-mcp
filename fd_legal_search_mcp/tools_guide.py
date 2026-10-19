@@ -24,6 +24,7 @@ from .errors import NotFound, Validation
 from .provenance import Provenance, ensure_provenance, with_provenance
 from .textmatch import escape_like
 from .annotations import annotations_for
+from .error_mapping import map_errors
 from . import limits
 
 #: provenance.source 固定口径（spec lex-mcp-surface）。
@@ -75,6 +76,7 @@ def register(mcp: FastMCP, settings: Settings) -> None:
         return get_pool("FDLEX_LAW_DATABASE_URL", settings.law_database_url)
 
     @mcp.tool(annotations=annotations_for("guide_cases_search"))
+    @map_errors
     def guide_cases_search(
         title_query: str,
         doc_type: str | None = None,
@@ -137,6 +139,7 @@ def register(mcp: FastMCP, settings: Settings) -> None:
         return {"results": items, "count": len(items), "truncated": truncated}
 
     @mcp.tool(annotations=annotations_for("guide_cases_read"))
+    @map_errors
     def guide_cases_read(case_id: str) -> dict[str, Any]:
         """Read one guiding case's full structured sections by case_id.
 

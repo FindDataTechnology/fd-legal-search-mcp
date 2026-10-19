@@ -22,6 +22,7 @@ from .errors import NotFound
 from .provenance import Provenance, ensure_provenance, with_provenance
 from .textmatch import escape_like, rank
 from .annotations import annotations_for
+from .error_mapping import map_errors
 from . import limits
 
 _LAW_DB_ENV = "FDLEX_LAW_DATABASE_URL"
@@ -91,6 +92,7 @@ def _provenance(row: dict[str, Any]) -> Provenance:
 def register(mcp: FastMCP, settings: Settings) -> None:
 
     @mcp.tool(annotations=annotations_for("legal_docs_search"))
+    @map_errors
     def legal_docs_search(
         title_query: str,
         source: str | None = None,
@@ -162,6 +164,7 @@ def register(mcp: FastMCP, settings: Settings) -> None:
         }
 
     @mcp.tool(annotations=annotations_for("legal_docs_read"))
+    @map_errors
     def legal_docs_read(
         doc_id: int,
         offset: int = 0,
@@ -193,7 +196,12 @@ def register(mcp: FastMCP, settings: Settings) -> None:
             (int(doc_id),),
         )
         if not rows:
-            return {"status": "not_found", "brand": _BRAND}
+            # 与另两个 read 工具一致：未找到走错误码而不是一个看起来成功的
+            # `{"status": "not_found"}` 载荷。同一服务里三个 read 工具对同一件
+            # 事给出两种形状，调用方就得写两条分支——而"写两条分支"正是
+            # 错误码标准化要消除的成本。
+            raise NotFound(
+                f"not_found：legal_documents 中不存在 doc_id={doc_id}")
         row = rows[0]
         out: dict[str, Any] = {k: row.get(k) for k in _READ_FIELDS}
         out["source_label_zh"] = _SOURCE_LABELS_ZH.get(row.get("source") or "")

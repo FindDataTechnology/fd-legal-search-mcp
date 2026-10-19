@@ -11,6 +11,7 @@ from typing import Any
 
 import pytest
 from fastmcp import Client
+from fastmcp.exceptions import ToolError
 
 import fd_legal_search_mcp.tools_corpus as tc
 from fd_legal_search_mcp.config import Settings
@@ -154,6 +155,12 @@ async def test_read_omits_content_key_when_body_missing(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_read_unknown_id_is_not_found(monkeypatch):
+    """未找到走错误码（与 law_read / guide_cases_read 一致）。
+
+    曾经返回一个成功的 `{"status": "not_found"}` 载荷，另两个 read 工具却抛
+    NotFound——同一服务对同一件事两种形状，调用方得写两条分支。
+    """
     _wire(monkeypatch, [])
-    out = await _call("legal_docs_read", doc_id=999999)
-    assert out["status"] == "not_found"
+    with pytest.raises(ToolError) as exc:
+        await _call("legal_docs_read", doc_id=999999)
+    assert "not_found" in str(exc.value)

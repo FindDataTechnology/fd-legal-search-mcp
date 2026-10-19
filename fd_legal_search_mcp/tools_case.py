@@ -46,6 +46,7 @@ from .errors import NotFound, UpstreamUnavailable
 from .provenance import Provenance, ensure_provenance, with_provenance
 from .textmatch import escape_like, rank
 from .annotations import annotations_for
+from .error_mapping import map_errors
 from . import limits
 
 logger = logging.getLogger(__name__)
@@ -323,6 +324,7 @@ def fetch_judgment_body(settings: Settings, block_key: str, doc_id: str) -> str 
 def register(mcp: FastMCP, settings: Settings) -> None:
 
     @mcp.tool(annotations=annotations_for("wenshu_search"))
+    @map_errors
     def wenshu_search(
         title_query: str,
         doc_type: str | None = None,
@@ -455,6 +457,7 @@ def register(mcp: FastMCP, settings: Settings) -> None:
         return out
 
     @mcp.tool(annotations=annotations_for("wenshu_read"))
+    @map_errors
     def wenshu_read(doc_id: str, offset: int = 0, max_chars: int = _MAX_CONTENT_CHARS) -> dict[str, Any]:
         """Read one judgment's full text (zstd blocks on RustFS).
 
