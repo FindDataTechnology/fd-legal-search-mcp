@@ -54,15 +54,73 @@ def manifest_tools(m: dict) -> dict[str, str]:
 
 async def runtime_tools() -> set[str]:
     """从运行时取真值；server 不可导入时回退到源码码点。"""
+    names = await runtime_annotation_map()
+    if names is None:
+        return source_tools()
+    return set(names)
+
+
+async def runtime_annotation_map() -> dict[str, dict] | None:
+    """运行时每个工具的行为属性（协议层原样值）；server 不可导入时返回 None。"""
     sys.path.insert(0, str(REPO))
     try:
-        from fd_legal_search_mcp.server import mcp  # type: ignore
+        from fd_legal_search_mcp.server import create_server
 
-        tools = await mcp.list_tools()
-        names = {getattr(t, "name", None) or t.get("name") for t in tools}
-        return {n for n in names if n}
+        tools = await create_server().list_tools()
     except Exception:
-        return source_tools()
+        return None
+    out: dict[str, dict] = {}
+    for t in tools:
+        name = getattr(t, "name", None) or t.get("name")
+        if not name:
+            continue
+        a = getattr(t, "annotations", None)
+        if a is None:
+            out[name] = {}
+            continue
+        out[name] = {
+            "readOnlyHint": a.readOnlyHint,
+            "destructiveHint": a.destructiveHint,
+            "idempotentHint": a.idempotentHint,
+            "openWorldHint": a.openWorldHint,
+        }
+    return out
+
+
+REQUIRED_HINTS = ("readOnlyHint", "destructiveHint", "idempotentHint", "openWorldHint")
+
+
+async def check_annotations(m: dict, declared: dict[str, str]) -> list[str]:
+    """manifest 行为属性 ↔ 运行时注册值逐项相等（两个方向都查）。
+
+    漏登记 → 客户端拿到 None，无从判断自动批准；谎报只读 → 客户端自动批准一个
+    会写库的工具。两者都是上牌缺陷。
+    """
+    ann = m.get("tool_annotations")
+    if not isinstance(ann, dict):
+        return ["manifest 缺 tool_annotations（行为属性须随工具一并上牌）"]
+    runtime = await runtime_annotation_map()
+    if runtime is None:
+        return ["[无法核对] server 不可导入，行为属性无法与运行时比对"]
+
+    problems: list[str] = []
+    for name in sorted(set(declared) - set(ann)):
+        problems.append(f"{name}: manifest 未声明行为属性")
+    for name in sorted(set(ann) - set(declared)):
+        problems.append(f"{name}: tool_annotations 登记了未上牌的工具")
+    for name in sorted(set(declared) & set(ann)):
+        d = ann[name]
+        missing = [k for k in REQUIRED_HINTS if k not in d]
+        if missing:
+            problems.append(f"{name}: 属性不全，缺 {missing}")
+            continue
+        rt = runtime.get(name, {})
+        for k in REQUIRED_HINTS:
+            if rt.get(k) != d[k]:
+                problems.append(
+                    f"{name}.{k}: manifest 声明 {d[k]!r} 与运行时 {rt.get(k)!r} 不符"
+                )
+    return problems
 
 
 def source_tools() -> set[str]:
@@ -128,6 +186,8 @@ async def main() -> int:
     expected_count = m.get("registry", {}).get("expected_tool_count")
     if expected_count is not None and len(actual) != expected_count:
         problems.append(f"[工具数不符] 运行时 {len(actual)} ≠ manifest 声明 {expected_count}")
+
+    problems += await check_annotations(m, declared)
 
     # 方向 2：闭合（消费侧 ⊆ commercial）
     internal = {t for t, lv in declared.items() if lv == "internal"}

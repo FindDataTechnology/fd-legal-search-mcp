@@ -20,6 +20,7 @@ from .config import Settings
 from .db import fetch_all, get_pool
 from .provenance import Provenance, ensure_provenance, with_provenance
 from .textmatch import escape_like, rank
+from .annotations import annotations_for
 
 _LAW_DB_ENV = "FDLEX_LAW_DATABASE_URL"
 
@@ -86,7 +87,7 @@ def _provenance(row: dict[str, Any]) -> Provenance:
 
 def register(mcp: FastMCP, settings: Settings) -> None:
 
-    @mcp.tool
+    @mcp.tool(annotations=annotations_for("legal_docs_search"))
     def legal_docs_search(
         title_query: str,
         source: str | None = None,
@@ -157,7 +158,7 @@ def register(mcp: FastMCP, settings: Settings) -> None:
             "brand": _BRAND,
         }
 
-    @mcp.tool
+    @mcp.tool(annotations=annotations_for("legal_docs_read"))
     def legal_docs_read(doc_id: int) -> dict[str, Any]:
         """Read one legal document by `doc_id`, body included only when fetched.
 

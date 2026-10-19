@@ -23,6 +23,7 @@ from .db import fetch_all, get_pool
 from .errors import NotFound, Validation
 from .provenance import Provenance, ensure_provenance, with_provenance
 from .textmatch import escape_like
+from .annotations import annotations_for
 
 #: provenance.source 固定口径（spec lex-mcp-surface）。
 PROVENANCE_SOURCE = "law_db.guide_cases"
@@ -71,7 +72,7 @@ def register(mcp: FastMCP, settings: Settings) -> None:
     def _pool() -> Any:
         return get_pool("FDLEX_LAW_DATABASE_URL", settings.law_database_url)
 
-    @mcp.tool
+    @mcp.tool(annotations=annotations_for("guide_cases_search"))
     def guide_cases_search(
         title_query: str,
         doc_type: str | None = None,
@@ -133,7 +134,7 @@ def register(mcp: FastMCP, settings: Settings) -> None:
         ensure_provenance(items)
         return {"results": items, "count": len(items), "truncated": truncated}
 
-    @mcp.tool
+    @mcp.tool(annotations=annotations_for("guide_cases_read"))
     def guide_cases_read(case_id: str) -> dict[str, Any]:
         """Read one guiding case's full structured sections by case_id.
 

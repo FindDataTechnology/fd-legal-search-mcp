@@ -310,7 +310,15 @@ async def test_law_search_signatures_match_business_mcp_surface(wired):
     server, _, _ = wired()
     async with Client(server) as client:
         tools = {t.name: t for t in await client.list_tools()}
-    props = {name: sorted((t.input_schema or {}).get("properties", {})) for name, t in tools.items()}
+    # fastmcp 2.x 用 input_schema、3.x 用 inputSchema（同一字段的两次改名）。
+    # 两版都在支持区间内（mcp-protocol-hardening 组 8），故按属性名探测，
+    # 不钉死某一版——否则测试结果取决于装的是哪版。
+    props = {
+        name: sorted(
+            (getattr(t, "input_schema", None) or t.inputSchema or {}).get("properties", {})
+        )
+        for name, t in tools.items()
+    }
     assert props["law_search"] == ["category", "limit", "title_query"]
     # law_read 带两个续读参数：条文按窗口返回，避免大法典一次性独占调用方上下文。
     assert props["law_read"] == ["law_id", "limit", "offset"]

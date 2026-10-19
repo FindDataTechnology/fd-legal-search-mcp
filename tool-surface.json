@@ -3,7 +3,9 @@
   "server": "fd-legal-search-mcp",
   "entry_path": "/fd-legal-search-mcp",
   "product_line": "lex",
-  "hosting": ["shared-instance"],
+  "hosting": [
+    "shared-instance"
+  ],
   "description": "识律（lex 线）法律检索 MCP：法条检索与条级引用解析、类案（裁判文书）检索、指导案例检索、五源法律语料检索。逐结果溯源，可私有化部署。",
   "skills_eligible_for_packs": [
     "civil-nine-step-workflow",
@@ -20,6 +22,68 @@
     "litigation-drafting",
     "evidence-card-organizer"
   ],
+  "tool_annotations": {
+    "law_search": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "law_read": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "law_semantic_search": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "law_reference": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "wenshu_search": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "wenshu_read": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "guide_cases_search": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "guide_cases_read": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "legal_docs_search": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "legal_docs_read": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
   "tool_groups": [
     {
       "group": "law",
