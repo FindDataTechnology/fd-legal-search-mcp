@@ -24,11 +24,13 @@ from .errors import NotFound, Validation
 from .provenance import Provenance, ensure_provenance, with_provenance
 from .textmatch import escape_like
 from .annotations import annotations_for
+from . import limits
 
 #: provenance.source 固定口径（spec lex-mcp-surface）。
 PROVENANCE_SOURCE = "law_db.guide_cases"
 
-_MAX_LIMIT = 200
+# 上限的唯一真源在 limits.py（mcp-result-contract）
+_MAX_LIMIT = limits.MAX_LIST_ITEMS
 
 _DOC_TYPES = frozenset({"case", "notice"})
 

@@ -24,13 +24,15 @@ from .errors import NotFound, Validation
 from .provenance import Provenance, ensure_provenance, with_provenance
 from .textmatch import escape_like, rank
 from .annotations import annotations_for
+from . import limits
 
 _LAW_DB_ENV = "FDLEX_LAW_DATABASE_URL"
 
 _BRAND = "finddata"
 
-_MAX_LIMIT = 200
-_MAX_TOP_K = 50
+# 上限的唯一真源在 limits.py（mcp-result-contract）
+_MAX_LIMIT = limits.MAX_LIST_ITEMS
+_MAX_TOP_K = limits.MAX_TOP_K
 
 # 溯源口径：law_db 各表 created_at（入库时间）为每行真实成立的口径日期；
 # 表内无独立"发布时间戳"字段时绝不编造（publish 是法规的发布日期，不是数据口径）。
@@ -282,8 +284,8 @@ _COUNT_CHUNKS_OF_LAW_SQL = (
 
 #: 单次返回的条文窗口：默认 200 条（一部典型法规的规模量级），硬上限 500。
 #: 整部法规全量回传会让大法典独占调用方上下文，故与正文一样按窗口给。
-_DEFAULT_CHUNK_WINDOW = 200
-_MAX_CHUNK_WINDOW = 500
+_DEFAULT_CHUNK_WINDOW = limits.DEFAULT_CHUNK_WINDOW
+_MAX_CHUNK_WINDOW = limits.MAX_CHUNK_WINDOW
 
 _CHUNK_CREATED_AT_SQL = (
     "SELECT chunk_id, created_at FROM law_chunks_v2 WHERE chunk_id = ANY(%(ids)s)"
@@ -292,7 +294,7 @@ _CHUNK_CREATED_AT_SQL = (
 _CHUNK_SNAPSHOT_SQL = "SELECT max(created_at) AS m FROM law_chunks_v2"
 
 # 条级摘录上限：单条条文超过此长度时截断并如实标注 truncated。
-_EXCERPT_MAX_CHARS = 2000
+_EXCERPT_MAX_CHARS = limits.MAX_EXCERPT_CHARS
 
 
 def register(mcp: FastMCP, settings: Settings) -> None:
@@ -351,7 +353,7 @@ def register(mcp: FastMCP, settings: Settings) -> None:
         if not row:
             raise NotFound(f"not_found：law_id={law_id} 在法规目录（law_db.laws）中不存在")
         law = _law_item(row)
-        window = max(1, min(int(limit), _MAX_CHUNK_WINDOW))
+        window = limits.clamp(limit, low=1, high=_MAX_CHUNK_WINDOW)
         start_at = max(0, int(offset))
         # Count first, then window: the caller needs the total to know whether a
         # next page exists, and it must not be inferred from a short page (which
@@ -374,19 +376,14 @@ def register(mcp: FastMCP, settings: Settings) -> None:
             "law": law,
             "chunks": chunks,
             "count": len(chunks),
-            "total_chunks": total,
-            "chunk_offset": start_at,
             "provenance": law["provenance"],
         }
-        if end_at < total:
-            out["truncated"] = True
-            out["next_offset"] = end_at
-            out["note"] = (
-                f"该法规共 {total} 条，本次返回第 {start_at}–{end_at} 条；"
-                f"续读请传 offset={end_at}。"
-            )
-        else:
-            out["truncated"] = False
+        # 统一的续读约定（limits.py）：total 始终给出，不只在上限时给——
+        # 调用方要靠它判断"还有没有下一页"，而短页在恰好整除时也会出现。
+        out.update(limits.truncation_fields(
+            total=total, offset=start_at, returned=len(chunks), unit="条",
+            truncated_key="truncated", offset_key="chunk_offset",
+            total_key="total_chunks"))
         return out
 
     @mcp.tool(annotations=annotations_for("law_semantic_search"))

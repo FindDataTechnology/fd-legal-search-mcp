@@ -46,13 +46,15 @@ from .errors import NotFound, UpstreamUnavailable
 from .provenance import Provenance, ensure_provenance, with_provenance
 from .textmatch import escape_like, rank
 from .annotations import annotations_for
+from . import limits
 
 logger = logging.getLogger(__name__)
 
 _BRAND = "finddata"
 _WENSHU_SOURCE = "wenshu_db.judgments"
 
-_MAX_LIMIT = 200
+# 上限的唯一真源在 limits.py（mcp-result-contract）
+_MAX_LIMIT = limits.MAX_LIST_ITEMS
 
 #: 候选采样上限：contains 查询一次最多取回的命中数（提前终止，防宽泛词拖垮）。
 _CANDIDATE_CAP = 2000
@@ -62,11 +64,11 @@ _CANDIDATE_CAP = 2000
 #: 而实测单篇最大约 41KB，也就是说旧上限只在最坏情况下起作用、一旦起作用
 #: 就是把调用方打爆。默认值取「一次放进上下文仍然可读」的量级；需要更长正文
 #: 的调用方用 offset 续读，而不是让单次响应变长。
-_MAX_CONTENT_CHARS = 12_000
+_MAX_CONTENT_CHARS = limits.DEFAULT_BODY_CHARS
 
 #: 单次窗口的硬上限：调用方可以把 ``max_chars`` 调大，但不能无界——那等于
 #: 把上限这件事取消掉，而它存在的理由正是保护调用方的上下文。
-_MAX_WINDOW_CHARS = 40_000
+_MAX_WINDOW_CHARS = limits.MAX_BODY_CHARS
 
 #: Internal coordinates and raw dictionary refs that must never reach a
 #: customer payload. SQL 只在过滤/定位时用它们，投影白名单 + 本黑名单双保险。
@@ -508,7 +510,7 @@ def register(mcp: FastMCP, settings: Settings) -> None:
             else:
                 out["content_available"] = True
                 out["total_chars"] = len(content)
-                window = max(1, min(int(max_chars), _MAX_WINDOW_CHARS))
+                window = limits.clamp(max_chars, low=1, high=_MAX_WINDOW_CHARS)
                 start_at = max(0, int(offset))
                 if start_at >= len(content) and content:
                     # Reading past the end is a caller error worth naming, not a
@@ -517,19 +519,11 @@ def register(mcp: FastMCP, settings: Settings) -> None:
                         f"offset {start_at} 超出正文长度 {len(content)}；"
                         "用 total_chars 上的偏移重试。"
                     )
-                chunk = content[start_at:start_at + window]
+                chunk, end_at, has_more = limits.slice_window(
+                    content, start_at, window)
                 out["content"] = chunk
-                end_at = start_at + len(chunk)
-                out["content_offset"] = start_at
-                if end_at < len(content):
-                    out["content_truncated"] = True
-                    out["next_offset"] = end_at
-                    out["note"] = (
-                        f"正文共 {len(content)} 字符，本次返回 [{start_at}, {end_at})；"
-                        f"续读请传 offset={end_at}。"
-                    )
-                else:
-                    out["content_truncated"] = False
+                out.update(limits.truncation_fields(
+                    total=len(content), offset=start_at, returned=len(chunk)))
         out = {k: v for k, v in out.items() if k not in _FORBIDDEN_KEYS}
         out = with_provenance(out, Provenance(_WENSHU_SOURCE, did, _as_of(row)))
         ensure_provenance([out])

@@ -18,15 +18,18 @@ from fastmcp import FastMCP
 
 from .config import Settings
 from .db import fetch_all, get_pool
+from .errors import NotFound
 from .provenance import Provenance, ensure_provenance, with_provenance
 from .textmatch import escape_like, rank
 from .annotations import annotations_for
+from . import limits
 
 _LAW_DB_ENV = "FDLEX_LAW_DATABASE_URL"
 
 _BRAND = "finddata"
 
-_MAX_LIMIT = 200
+# 上限的唯一真源在 limits.py（mcp-result-contract）
+_MAX_LIMIT = limits.MAX_LIST_ITEMS
 
 #: 五源封闭词表，与 legal_documents.source 存储值逐一对应。
 #: 非法值直接拒绝（`invalid_filter`），不静默匹配空集。
@@ -159,7 +162,11 @@ def register(mcp: FastMCP, settings: Settings) -> None:
         }
 
     @mcp.tool(annotations=annotations_for("legal_docs_read"))
-    def legal_docs_read(doc_id: int) -> dict[str, Any]:
+    def legal_docs_read(
+        doc_id: int,
+        offset: int = 0,
+        max_chars: int = limits.DEFAULT_BODY_CHARS,
+    ) -> dict[str, Any]:
         """Read one legal document by `doc_id`, body included only when fetched.
 
         Returns full metadata (including `source_url` and the crawler `metadata`
@@ -167,6 +174,11 @@ def register(mcp: FastMCP, settings: Settings) -> None:
         the body never made it into the corpus the answer carries an honest
         `note` and the `content` key is **absent** — not an empty string.
         Unknown ids return `not_found`.
+
+        正文按窗口返回：单次最多 ``max_chars`` 字符（默认 12000，上限 40000），
+        从 ``offset`` 起算。本语料实测有 493 篇正文超过默认窗口、最长 177,139
+        字符——不分段会一次吃掉调用方的上下文预算。``total_chars`` 与
+        ``next_offset`` 给出续读位置；按字符切分，分段拼接后与原文逐字符一致。
         """
         pool = get_pool(_LAW_DB_ENV, settings.law_database_url)
         rows = fetch_all(
@@ -188,7 +200,18 @@ def register(mcp: FastMCP, settings: Settings) -> None:
         out["metadata"] = _strip_object_keys(out.get("metadata"))
         out["content_available"] = bool(row.get("content_available"))
         if out["content_available"]:
-            out["content"] = row.get("content")
+            body = row.get("content") or ""
+            start_at = max(0, int(offset))
+            if start_at >= len(body) and body:
+                # 越界要点名，不回空串——空串看起来像"文档到此为止"。
+                raise NotFound(
+                    f"not_found：offset {start_at} 超出正文长度 {len(body)}；"
+                    "用 total_chars 内的偏移重试。"
+                )
+            chunk, end_at, has_more = limits.slice_window(body, start_at, max_chars)
+            out["content"] = chunk
+            out.update(limits.truncation_fields(
+                total=len(body), offset=start_at, returned=len(chunk)))
         else:
             out["note"] = _NO_BODY_NOTE
         out["brand"] = _BRAND
