@@ -59,6 +59,8 @@ _MAX_LIMIT = limits.MAX_LIST_ITEMS
 
 #: 候选采样上限：contains 查询一次最多取回的命中数（提前终止，防宽泛词拖垮）。
 _CANDIDATE_CAP = 2000
+_HEAD_CAP = 50        # exact 段窗口（ILIKE 无通配，trgm 可用）
+_PREFIX_CAP = 500     # prefix 段窗口（ILIKE x%）
 
 #: 正文返回上限（字符）；超出截断并如实标注 + 给出续读游标。
 #: 20 万字符的中文正文约等于 20 万 token——足以独占一次对话的上下文预算，
@@ -387,8 +389,37 @@ def register(mcp: FastMCP, settings: Settings) -> None:
                 params["end_year"] = int(end_year)
                 filter_sql += '  AND j."判决年份" <= %(end_year)s\n'
 
-            # 候选阶段：窄列（doc_id/标题）+ 位图路径 + LIMIT 提前终止。
-            rows = _fetch_candidates(
+            # 候选阶段（三段分窗，2026-11-06 排序契约修复）：旧形态是「无序 LIMIT 2000
+            # + Python rank 重排」——3700 万行 contains 命中远超窗口时，exact/prefix 行
+            # 根本进不了无序截断窗（金集首证：『买卖合同纠纷』exact 段 48 行全被吞）。
+            # 现形态：exact 段（ILIKE 无通配，trgm 可用）+ prefix 段各取小窗，与 contains
+            # 段（旧路径，最坏成本不变）合并后 Python 重排。filter_sql（省/年份）只属于
+            # contains 段——分窗段保持纯标题语义，过滤由最终排序裁剪。
+            rows: list[dict[str, Any]] = []
+            sampled = False
+            total_candidates = 0
+            try:
+                head = _fetch_candidates(
+                    pool,
+                    'SELECT j."doc_id" AS doc_id, j."标题" AS 标题\n'
+                    "FROM judgments j\n"
+                    'WHERE j."标题" ILIKE %s LIMIT %s',
+                    (q, _HEAD_CAP),
+                )
+            except Exception:
+                head = []
+            try:
+                pref = _fetch_candidates(
+                    pool,
+                    'SELECT j."doc_id" AS doc_id, j."标题" AS 标题\n'
+                    "FROM judgments j\n"
+                    'WHERE j."标题" ILIKE %s LIMIT %s',
+                    (q + "%", _PREFIX_CAP),
+                )
+            except Exception:
+                pref = []
+            seen_ids = {r["doc_id"] for r in head} | {r["doc_id"] for r in pref}
+            tail_rows = _fetch_candidates(
                 pool,
                 'SELECT j."doc_id" AS doc_id, j."标题" AS 标题\n'
                 "FROM judgments j\n"
@@ -396,10 +427,12 @@ def register(mcp: FastMCP, settings: Settings) -> None:
                 "LIMIT %(cap)s",
                 params,
             )
-            sampled = len(rows) >= _CANDIDATE_CAP
-            total_candidates = len(rows)
-            rows = sorted(rows, key=lambda r: (rank(r.get("标题"), needle),
-                                               r.get("标题") or ""))[:limit]
+            tail_rows = [r for r in tail_rows if r["doc_id"] not in seen_ids]
+            sampled = len(tail_rows) >= _CANDIDATE_CAP
+            total_candidates = len(head) + len(pref) + len(tail_rows)
+            rows = sorted(head + pref + tail_rows,
+                          key=lambda r: (rank(r.get("标题"), needle),
+                                         r.get("标题") or ""))[:limit]
             if not rows:
                 return {"results": [], "count": 0, "truncated": False,
                         "brand": _BRAND}

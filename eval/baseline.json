@@ -1,0 +1,30 @@
+{
+ "generated_at": "2026-11-05T21:12:11.499573+00:00",
+ "source_sha": "c8f43ae",
+ "domains": {
+  "case": {
+   "ndcg10": 0.1,
+   "hit5": 0.1,
+   "mrr": 0.1
+  },
+  "guide": {
+   "ndcg10": 1.0,
+   "hit5": 1.0,
+   "mrr": 1.0
+  },
+  "law": {
+   "ndcg10": 1.0,
+   "hit5": 1.0,
+   "mrr": 1.0
+  }
+ },
+ "core": {
+  "metric": "ndcg@10",
+  "per_domain": {
+   "case": 0.1,
+   "guide": 1.0,
+   "law": 1.0
+  },
+  "macro": 0.7
+ }
+}
