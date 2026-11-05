@@ -85,19 +85,147 @@
     }
   },
   "output_structure": {
-    "declared": [],
-    "undeclared": [
-      "guide_cases_read",
-      "guide_cases_search",
-      "law_read",
-      "law_reference",
-      "law_search",
-      "law_semantic_search",
-      "legal_docs_read",
-      "legal_docs_search",
-      "wenshu_read",
-      "wenshu_search"
-    ],
+    "declared": {
+      "law_search": {
+        "top": [
+          "count",
+          "results",
+          "truncated"
+        ],
+        "item_keys": [
+          "id",
+          "title",
+          "category",
+          "type",
+          "status",
+          "publish",
+          "expiry",
+          "brand",
+          "provenance"
+        ]
+      },
+      "law_read": {
+        "top": [
+          "law",
+          "chunks",
+          "count",
+          "chunk_offset",
+          "next_offset",
+          "note"
+        ]
+      },
+      "law_semantic_search": {
+        "top": [
+          "query",
+          "results",
+          "count"
+        ],
+        "item_keys": [
+          "law_id",
+          "chunk_no",
+          "title",
+          "category",
+          "law_type",
+          "law_status",
+          "publish",
+          "chunk_text",
+          "score",
+          "point_id",
+          "brand",
+          "provenance"
+        ]
+      },
+      "law_reference": {
+        "top": [
+          "query",
+          "law",
+          "chunk",
+          "article",
+          "provenance"
+        ]
+      },
+      "wenshu_search": {
+        "top": [
+          "count",
+          "results",
+          "truncated",
+          "brand"
+        ],
+        "item_keys": [
+          "doc_id",
+          "案号",
+          "标题",
+          "法院",
+          "案由",
+          "省",
+          "市",
+          "案件类型",
+          "文书类型",
+          "审理程序",
+          "法院级别",
+          "判决年份",
+          "判决结果",
+          "判决时间",
+          "发布时间",
+          "has_body",
+          "brand",
+          "provenance"
+        ]
+      },
+      "wenshu_read": {
+        "top": [
+          "doc",
+          "chunks",
+          "count",
+          "offset",
+          "next_offset"
+        ]
+      },
+      "guide_cases_search": {
+        "top": [
+          "count",
+          "results",
+          "truncated"
+        ],
+        "item_keys": [
+          "source_id",
+          "case_no",
+          "doc_type",
+          "title",
+          "listed_at",
+          "publish_at",
+          "reference_status",
+          "provenance"
+        ]
+      },
+      "guide_cases_read": {
+        "top": [
+          "item",
+          "count"
+        ]
+      },
+      "legal_docs_search": {
+        "top": [
+          "count",
+          "results",
+          "truncated",
+          "brand"
+        ],
+        "item_keys": [
+          "has_content",
+          "source_label_zh",
+          "brand",
+          "provenance"
+        ]
+      },
+      "legal_docs_read": {
+        "top": [
+          "doc",
+          "count"
+        ]
+      }
+    },
+    "undeclared": [],
     "note": "未声明输出结构（已知缺口）。原因：本服务的返回形状随输入变化较大（过滤参数、可选字段、上游缺省），逐工具声明需先固化契约，排在 mcp-protocol-hardening 组 2 之后的迭代。清单显式登记此状态，使客户端不会把「未声明」误读为「无结构」。"
   },
   "naming_convention": {
