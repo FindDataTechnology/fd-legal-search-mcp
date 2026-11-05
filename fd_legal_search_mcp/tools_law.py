@@ -19,6 +19,7 @@ from fastmcp import FastMCP
 
 from .config import Settings
 from .db import fetch_all, fetch_one, get_pool, get_qdrant
+from .rerank import recall_window, rerank
 from .embedding import get_embedder
 from .errors import NotFound, Validation
 from .provenance import Provenance, ensure_provenance, with_provenance
@@ -407,7 +408,7 @@ def register(mcp: FastMCP, settings: Settings) -> None:
         response = client.query_points(
             collection_name=settings.qdrant_collection,
             query=vector,
-            limit=top_k,
+            limit=recall_window(top_k),
             with_payload=True,
         )
         points = list(getattr(response, "points", []) or [])
@@ -447,6 +448,7 @@ def register(mcp: FastMCP, settings: Settings) -> None:
             as_of = _as_of_date(created.get(stable_id)) or snapshot_as_of
             results.append(with_provenance(item, Provenance(_SOURCE_CHUNKS, stable_id, as_of)))
         ensure_provenance(results)
+        results = rerank(results, q, top_k)
         return {"query": q, "results": results, "count": len(results)}
 
     @mcp.tool(annotations=annotations_for("law_reference"))

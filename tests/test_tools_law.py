@@ -371,18 +371,19 @@ async def test_semantic_search_returns_scored_chunks_with_provenance(wired):
     top = data["results"][0]
     assert top["law_id"] == "69695" and top["chunk_no"] == 43
     assert top["score"] == 0.8123
+    assert top.get("reranked") is True
     assert top["provenance"]["source"] == "law_db.law_chunks_v2"
     assert top["provenance"]["stable_id"] == "69695:43"
     assert top["provenance"]["as_of"] == _INGEST_TS.date().isoformat()
     assert top["publish"] == "2020-05-28 00:00:00"
-    assert qdrant.calls[-1]["limit"] == 2
+    assert qdrant.calls[-1]["limit"] == 8  # rerank 召回扩窗 = top_k×4
 
 
 async def test_semantic_search_clamps_top_k(wired):
     server, _, qdrant = wired(qdrant_points=[_qdrant_point("1", 0, 0.5)])
     async with Client(server) as client:
         await client.call_tool("law_semantic_search", {"query": "x", "top_k": 999})
-    assert qdrant.calls[-1]["limit"] == 50
+    assert qdrant.calls[-1]["limit"] == 50  # 召回窗与 MAX_TOP_K 对齐，不缩
 
 
 async def test_semantic_search_empty_query_is_validation(wired):
