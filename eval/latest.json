@@ -1,11 +1,11 @@
 {
- "generated_at": "2026-11-05T21:28:05.949599+00:00",
- "source_sha": "c8f43ae",
+ "generated_at": "2026-11-05T21:50:16.682559+00:00",
+ "source_sha": "2bd0ab0",
  "domains": {
   "case": {
-   "ndcg10": 0.52,
-   "hit5": 0.5,
-   "mrr": 0.531
+   "ndcg10": 0.6207,
+   "hit5": 0.6,
+   "mrr": 0.6167
   },
   "guide": {
    "ndcg10": 1.0,
@@ -21,10 +21,10 @@
  "core": {
   "metric": "ndcg@10",
   "per_domain": {
-   "case": 0.52,
+   "case": 0.6207,
    "guide": 1.0,
    "law": 1.0
   },
-  "macro": 0.84
+  "macro": 0.8736
  }
 }
