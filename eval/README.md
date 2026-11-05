@@ -11,6 +11,11 @@ wenshu_search 候选阶段「无序 LIMIT 2000」在 contains 命中 >> 2000 时
 完全吞掉（『买卖合同纠纷』exact 48 行全不进窗）。已修：三段分窗候选（exact 50/prefix 500/
 contains 2000 合并重排）。修复后 case 域 nDCG@10 0.1→0.52。
 
+## 金集 v2 口径
+case 域期望锚「标题组」（同标题 48 行在 3700 万语料里语义可互换，锚特定行会误判）。
+剩余 case 失分=组内行序（PG 任意序 vs 工具排序），非漏检——查询扩展（D3）经论证
+无增益，记 deliberate non-do。
+
 ## 运行
 ```sh
 set -a && source .env && set +a
