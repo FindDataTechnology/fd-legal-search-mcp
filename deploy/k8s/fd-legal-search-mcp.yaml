@@ -28,7 +28,9 @@ spec:
     spec:
       containers:
         - name: mcp
-          image: ccr.ccs.tencentyun.com/finddata-business/fd-legal-search-mcp:sha-eb71d36
+          # 2026-11-12 sha-87f4fe9：线自有共享 bearer 门（change converge-line-identity-and-keys 8.6）。
+          # 源真 2fb9191（github 线）；回滚=sha-eb71d36
+          image: ccr.ccs.tencentyun.com/finddata-business/fd-legal-search-mcp:sha-87f4fe9
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -39,6 +41,15 @@ spec:
           envFrom:
             - secretRef:
                 name: fd-legal-search-env
+          env:
+            # 8.6 翻转第二步：与注册表 backend auth 的 auth_credential 必须逐字节相同
+            # （注册表在出口把 Authorization 换成这把令牌；本线门按 Bearer 精确比较）。
+            # 未设=门不存在（与接入前逐字节一致）；设了才生效。值只在 Secret 里。
+            - name: MCP_BEARER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: fd-legal-search-line-token
+                  key: MCP_BEARER_TOKEN
           resources:
             requests: { cpu: 20m, memory: 96Mi }
             limits: { cpu: 500m, memory: 1Gi }
