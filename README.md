@@ -43,3 +43,10 @@ GitHub Actions -> TCR。每次 push 到 `main` 先跑测试，通过后构建并
 tag 为 `sha-<短哈希>` + 滚动 `main`。构建发生在**公开**镜像仓（`scs001/fd-legal-search-mcp`）：
 私有仓的 Actions 有月度分钟额度，用尽后 job 会在启动阶段直接失败（无 runner、无日志），
 公开仓不限时。发布脚本：`scripts/publish-public-mirror.sh`。
+
+## 案卷产物契约（跨仓共用）
+
+检索结果若要作为案卷产物登记（change `lex-matter-spine`），除本仓 `provenance` 三件套外，
+还须满足案卷产物契约：`../fd-lex/contracts/lex-artifact.schema.json`（四项必填
+`producer` / `refs` / `sha256` / `payload`；检索类另需 `provenance`）。本仓的
+`ensure_provenance()` 与该契约的 `provenance` 部分是同一口径，不另立第二套。
