@@ -28,9 +28,11 @@ spec:
     spec:
       containers:
         - name: mcp
-          # 2026-11-12 sha-87f4fe9：线自有共享 bearer 门（change converge-line-identity-and-keys 8.6）。
-          # 源真 2fb9191（github 线）；回滚=sha-eb71d36
-          image: ccr.ccs.tencentyun.com/finddata-business/fd-legal-search-mcp:sha-87f4fe9
+          # 2026-11-12 sha-87f4fe9：线自有共享 bearer 门（change converge-line-identity-and-keys 8.6），
+          # 源真 2fb9191（github 线）。
+          # 2026-11-13 sha-5976f65：+ /.well-known/line-manifest.json 自描述端点（1.4 投影，公开免鉴权；
+          # 镜像新增 COPY line-manifest.json，门的 EXEMPT_PATHS 同步加该路径）；回滚=sha-87f4fe9
+          image: ccr.ccs.tencentyun.com/finddata-business/fd-legal-search-mcp:sha-5976f65
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
