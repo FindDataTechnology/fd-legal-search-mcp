@@ -10,6 +10,15 @@
   },
   "auth_tracks": [
     {
+      "kind": "line-native",
+      "name": "mcp-bearer-token",
+      "accepts": "line-native-key",
+      "fallback": true,
+      "enforced": true,
+      "migration_task": "converge-line-identity-and-keys#8.6",
+      "note": "线自有共享钥匙（`MCP_BEARER_TOKEN`），**已在运行路径生效**（2026-11-12 翻转，change converge-line-identity-and-keys 8.6）。翻转两步：① 注册表服务器级 backend auth（该 server 行 `auth_scheme=bearer` + `auth_credential` = 同一把令牌，出口由 auth-server 把 `Authorization` 换成它；`PATCH /api/servers/<path>/auth-credential`）→ ② 线侧 Secret `fd-legal-search-line-token` 注入 `MCP_BEARER_TOKEN` 并滚版（本线镜像 `sha-87f4fe9`）。**实测判据**：匿名直连 **401** `{\"error\":\"unauthorized\"}`、假令牌 **401**、真令牌 **200** 且拿到 MCP session；探针路径 /health,/healthz 豁免（不带令牌仍 200）；注册表行 `scheme=bearer enabled=true health=healthy tools=10`；经网关 initialize → 200（admin JWT）。**这正是 fallback 轨**：摘掉平台后，持有该令牌的客户仍能直接消费本线。⚠️ 共享钥匙**不承载客户身份**——客户级隔离/配额仍要靠平台（词元轨，见 `ciyuan-sk` 那条的 migration_task）。"
+    },
+    {
       "kind": "customer-key",
       "accepts": "ciyuan-sk",
       "fallback": false,
