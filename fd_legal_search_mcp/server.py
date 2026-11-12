@@ -27,6 +27,10 @@ INSTRUCTIONS = (
 def create_server(settings: Settings | None = None) -> FastMCP:
     settings = settings or Settings.from_env()
     mcp: FastMCP = FastMCP(SERVER_NAME, instructions=INSTRUCTIONS)
+
+    from . import wellknown
+
+    wellknown.register(mcp)  # /.well-known/line-manifest.json（公开、免鉴权、零网络）
     tools_law.register(mcp, settings)
     tools_case.register(mcp, settings)
     tools_guide.register(mcp, settings)

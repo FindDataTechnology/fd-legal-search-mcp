@@ -17,7 +17,7 @@
 | `guide_cases_search` / `guide_cases_read` | 指导案例检索 / 读取 | `law_db.guide_cases`（278+15） | task 1.4 |
 | `legal_docs_search` / `legal_docs_read` | 五源语料检索 / 读取 | `law_db.legal_documents`（47,256 篇） | task 7.1（迁自 business-mcp，等价对账） |
 
-骨架阶段：全部工具以诚实错误回报未接线状态（消息含 tracking task），不返回编造数据；未命中一律如实返回空结果。
+全部工具均已在册并接线（2026-10-19 起 10/10 commercial）；上游不可用或参数缺失时以结构化错误如实回报（含 upstream/tracking），不返回编造数据；未命中一律如实返回空结果。
 
 ## 溯源契约
 
@@ -43,3 +43,10 @@ GitHub Actions -> TCR。每次 push 到 `main` 先跑测试，通过后构建并
 tag 为 `sha-<短哈希>` + 滚动 `main`。构建发生在**公开**镜像仓（`scs001/fd-legal-search-mcp`）：
 私有仓的 Actions 有月度分钟额度，用尽后 job 会在启动阶段直接失败（无 runner、无日志），
 公开仓不限时。发布脚本：`scripts/publish-public-mirror.sh`。
+
+## 案卷产物契约（跨仓共用）
+
+检索结果若要作为案卷产物登记（change `lex-matter-spine`），除本仓 `provenance` 三件套外，
+还须满足案卷产物契约：`../fd-lex/contracts/lex-artifact.schema.json`（四项必填
+`producer` / `refs` / `sha256` / `payload`；检索类另需 `provenance`）。本仓的
+`ensure_provenance()` 与该契约的 `provenance` 部分是同一口径，不另立第二套。
