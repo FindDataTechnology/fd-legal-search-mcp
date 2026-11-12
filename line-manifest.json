@@ -1,0 +1,34 @@
+{
+  "schema": "line-manifest/v1",
+  "line": "legal-search",
+  "public_base_url": "https://mcp.finddatatech.cloud/fd-legal-search-mcp",
+  "identity": {
+    "issuer": "https://auth.finddatatech.cloud/oidc",
+    "jwks_uri": "https://auth.finddatatech.cloud/oidc/jwks",
+    "jit_policy": "off",
+    "note": "本仓零入站凭据校验：`FastMCP(SERVER_NAME, ...)` 未传 auth、未挂中间件（server.py:29）。仓内 `api_key` 是出站 Qdrant/嵌入凭据（config.py:24-49、embedding.py:17-44）。无断言兑换端点，jit_policy=off。"
+  },
+  "auth_tracks": [
+    {
+      "kind": "customer-key",
+      "accepts": "ciyuan-sk",
+      "fallback": false,
+      "enforced": false,
+      "migration_task": "converge-line-identity-and-keys#8.3",
+      "note": "未接：本仓不解析入站凭据。"
+    }
+  ],
+  "scopes": [
+    "line:read"
+  ],
+  "billing": {
+    "plane": "ciyuan",
+    "note": "本仓零计费代码（grep `sub2api` 无命中）：按调用扣费发生在网关/registry 的词元平面，不在本线代码里。只读检索；嵌入开销由本线出站凭据承担。"
+  },
+  "surfaces": {
+    "mcp": true,
+    "account": false,
+    "admin": false
+  },
+  "note": "10 个只读工具：法条检索与条级引用解析 / 类案 / 指导案例 / 五源语料；逐结果溯源，可私有化部署（私有化包里由客户自己的前置代理做鉴权）。"
+}
