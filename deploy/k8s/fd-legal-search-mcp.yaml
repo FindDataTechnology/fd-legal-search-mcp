@@ -32,7 +32,7 @@ spec:
           # 源真 2fb9191（github 线）。
           # 2026-11-13 sha-5976f65：+ /.well-known/line-manifest.json 自描述端点（1.4 投影，公开免鉴权；
           # 镜像新增 COPY line-manifest.json，门的 EXEMPT_PATHS 同步加该路径）；回滚=sha-87f4fe9
-          image: ccr.ccs.tencentyun.com/finddata-business/fd-legal-search-mcp:sha-5976f65
+          image: ccr.ccs.tencentyun.com/finddata-business/fd-legal-search-mcp:sha-29f7cb9 # ｜2026-11-15 sha-29f7cb9：公开载荷剥离（清单 5 段 note 移仓内 docs/，镜像仓 scs001 同步补齐 wellknown/COPY）｜回滚=sha-5976f65
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
