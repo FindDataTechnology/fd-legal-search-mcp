@@ -24,7 +24,7 @@ def cli() -> None:
 )
 def serve(host: str, port: int, transport: str) -> None:
     """运行 MCP 服务器（容器用 http，本地助手接线用 stdio）。"""
-    from .auth import BearerAuthMiddleware, configured_token
+    from .auth import BearerAuthMiddleware, gate_enabled
     from .server import create_server
 
     server = create_server()
@@ -32,7 +32,7 @@ def serve(host: str, port: int, transport: str) -> None:
         server.run(transport="stdio")
         return
 
-    if not configured_token():
+    if not gate_enabled():
         # 未配 token = 与接入前逐字节一致（不挂任何中间件）。
         server.run(transport=transport, host=host, port=port)
         return
