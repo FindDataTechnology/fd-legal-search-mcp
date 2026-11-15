@@ -52,6 +52,17 @@ spec:
                 secretKeyRef:
                   name: fd-legal-search-line-token
                   key: MCP_BEARER_TOKEN
+            # 门 K 客户轨（converge-line-identity-and-keys 8.7）：网关把客户 sk- 换成一枚
+            # aud/source=legal-search、exp ≤600s 的 ES256 票，线侧只用这把公钥离线验签，
+            # 不回调平台、不逐请求问计费。未配=词元轨 not_configured（与接入前逐字节
+            # 一致）；共享 bearer 轨不受影响（先恒时比较，不匹配才验签）。
+            - name: FD_LEGAL_SEARCH_LINE_TOKEN_ISSUER
+              value: "https://mcp.finddatatech.cloud"
+            - name: FD_LEGAL_SEARCH_LINE_TOKEN_PUBLIC_KEY_PEM
+              valueFrom:
+                secretKeyRef:
+                  name: fd-legal-search-line-token
+                  key: public_key_pem
           resources:
             requests: { cpu: 20m, memory: 96Mi }
             limits: { cpu: 500m, memory: 1Gi }
