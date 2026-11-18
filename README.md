@@ -1,5 +1,7 @@
 # fd-legal-search-mcp
 
+> **Part of the [Lex line (寻数·识律)](https://www.finddatatech.cloud/products/lex) of [FindData](https://www.finddatatech.cloud)** — Legal search MCP — retrieval over the legal corpus, exposed as agent tools.
+
 识律（lex 线）法律检索 MCP：法条检索与条级引用解析、类案检索（裁判文书）、指导案例检索、五源法律语料——逐结果溯源，可私有化部署。
 
 新仓依据 `openspec/changes/lex-platform-v1`（task 1.1）。本服务是 2026-09-19「不新建 server」决定的翻案落地：`wenshu_db` 在库已消解「类案检索无数据源」的前提。
