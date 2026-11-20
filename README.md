@@ -1,5 +1,11 @@
 # fd-legal-search-mcp
 
+<!-- deploy-location -->
+> **部署清单不在本仓。** 集群清单已迁至 `fd-infra-deploy/all-services/`，
+> Application 定义在 `fd-infra-deploy/argocd/`。
+> 原因与判据：`openspec/changes/consolidate-deploy-manifests`（2026-11-20）。
+
+
 > **Part of the [Lex line (寻数·识律)](https://www.finddatatech.cloud/products/lex) of [FindData](https://www.finddatatech.cloud)** — Legal search MCP — retrieval over the legal corpus, exposed as agent tools.
 
 识律（lex 线）法律检索 MCP：法条检索与条级引用解析、类案检索（裁判文书）、指导案例检索、五源法律语料——逐结果溯源，可私有化部署。

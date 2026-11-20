@@ -1,3 +1,8 @@
+> **部署清单已迁走（2026-11-20）**
+> 本仓不再承载集群清单。清单在 `fd-infra-deploy/all-services/fd-legal-search-mcp/`，
+> Application 定义在 `fd-infra-deploy/argocd/app-fd-legal-search-mcp.yaml`。
+> 原因与判据：`openspec/changes/consolidate-deploy-manifests`。
+
 # fd-legal-search-mcp 部署 runbook（lex-platform-v1）
 
 通道：tcr-image-pipeline（GHA→TCR→relay）+ mcp-service-deploy（ArgoCD/GitOps、不可变 sha- tag）。
